@@ -1,0 +1,107 @@
+<!-- dashboard.html -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Dashboard - Realtime</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="dashboard-container">
+    <h2>ตารางข้อมูลผู้มาติดต่อ (Security Dashboard)</h2>
+    <table id="visitorTable">
+      <thead>
+        <tr>
+          <th>วันที่</th>
+          <th>เวลาเข้า</th>
+          <th>เวลาออก</th>
+          <th>ชื่อ-นามสกุล</th>
+          <th>บริษัท</th>
+          <th>ประเภทรถ</th>
+          <th>ทะเบียน (หัว/หาง)</th>
+          <th>วัตถุประสงค์</th>
+          <th>แผนกที่ติดต่อ</th>
+          <th>เบอร์โทร</th>
+          <th>สถานะ</th>
+          <th>จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <!-- ข้อมูลจะถูกดึงมาแสดงที่นี่ผ่าน JavaScript -->
+      </tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { db, collection, onSnapshot, query, orderBy, updateDoc, doc } from './firebase-config.js';
+
+    const tableBody = document.getElementById('tableBody');
+
+    // ดึงข้อมูลแบบ Real-time เรียงจากล่าสุดไปเก่าสุด
+    const q = query(collection(db, "visitors"), orderBy("timestamp", "desc"));
+
+    onSnapshot(q, (snapshot) => {
+      tableBody.innerHTML = ''; // ล้างข้อมูลเก่าก่อนเรนเดอร์ใหม่
+      
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+        
+        const tr = document.createElement('tr');
+        
+        // เช็คสถานะเพื่อจัดการสีข้อความและปุ่ม
+        const isCheckedOut = data.status === "ออกพื้นที่แล้ว";
+        const statusClass = isCheckedOut ? "status-out" : "status-in";
+        const buttonDisabled = isCheckedOut ? "disabled" : "";
+        const buttonText = isCheckedOut ? "ออกแล้ว" : "Check-out";
+
+        tr.innerHTML = `
+          <td>${data.date}</td>
+          <td>${data.timeIn}</td>
+          <td>${data.timeOut}</td>
+          <td>${data.prefix}${data.fullName}</td>
+          <td>${data.company}</td>
+          <td>${data.vehicleType}</td>
+          <td>${data.licensePlate} / ${data.trailerPlate}</td>
+          <td>${data.purpose}</td>
+          <td>${data.department}</td>
+          <td>${data.phone}</td>
+          <td class="${statusClass}">${data.status}</td>
+          <td>
+            <button class="checkout-btn" data-id="${id}" ${buttonDisabled}>${buttonText}</button>
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
+
+      // ผูก Event ให้ปุ่ม Check-out ทั้งหมด
+      document.querySelectorAll('.checkout-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+          const docId = e.target.getAttribute('data-id');
+          await checkoutVisitor(docId);
+        });
+      });
+    });
+
+    // ฟังก์ชันสำหรับ Check-out
+    async function checkoutVisitor(docId) {
+      if(confirm('ยืนยันการนำรถคันนี้ออกพื้นที่?')) {
+        const now = new Date();
+        const timeOutStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        
+        const docRef = doc(db, "visitors", docId);
+        try {
+          await updateDoc(docRef, {
+            timeOut: timeOutStr,
+            status: "ออกพื้นที่แล้ว"
+          });
+        } catch (error) {
+          console.error("Error updating document: ", error);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

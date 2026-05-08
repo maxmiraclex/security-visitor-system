@@ -1,0 +1,146 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ลงทะเบียนผู้มาติดต่อ - ศูนย์กระจายสินค้า</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="form-container">
+    <h2>ลงทะเบียนผู้มาติดต่อ</h2>
+    <form id="visitorForm">
+      <!-- ซ่อนวันที่ไว้ ระบบจะดึงเอง -->
+      <input type="hidden" id="visitDate">
+      
+      <div class="form-group">
+        <label>คำนำหน้า</label>
+        <select id="prefix" required>
+          <option value="" disabled selected>เลือกคำนำหน้า</option>
+          <option value="นาย">นาย</option>
+          <option value="นาง">นาง</option>
+          <option value="นางสาว">นางสาว</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>ชื่อ-นามสกุล</label>
+        <input type="text" id="fullName" placeholder="ระบุชื่อ-นามสกุล" required>
+      </div>
+
+      <div class="form-group">
+        <label>บริษัทฯ (ต้นสังกัด)</label>
+        <input type="text" id="company" placeholder="ระบุชื่อบริษัท" required>
+      </div>
+
+      <div class="form-group">
+        <label>ประเภทรถ</label>
+        <select id="vehicleType" required>
+          <option value="" disabled selected>เลือกประเภทรถ</option>
+          <option value="รถบรรทุก 4 ล้อ">รถบรรทุก 4 ล้อ</option>
+          <option value="รถบรรทุก 6 ล้อ">รถบรรทุก 6 ล้อ</option>
+          <option value="รถบรรทุก 10 ล้อ">รถบรรทุก 10 ล้อ</option>
+          <option value="รถบรรทุก 18 ล้อ">รถบรรทุก 18 ล้อ</option>
+          <option value="รถบรรทุก 22 ล้อ">รถบรรทุก 22 ล้อ</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>ทะเบียนรถ (หัว)</label>
+        <input type="text" id="licensePlate" placeholder="ระบุทะเบียนรถ" required>
+      </div>
+
+      <div class="form-group">
+        <label>ทะเบียนหาง (เฉพาะรถ 6 ล้อขึ้นไป)</label>
+        <input type="text" id="trailerPlate" placeholder="ระบุทะเบียนหาง (ถ้ามี)">
+      </div>
+
+      <div class="form-group">
+        <label>วัตถุประสงค์</label>
+        <select id="purpose" required>
+          <option value="" disabled selected>เลือกวัตถุประสงค์</option>
+          <option value="ติดต่อส่งเอกสาร">ติดต่อส่งเอกสาร</option>
+          <option value="ส่งตู้เปล่า">ส่งตู้เปล่า</option>
+          <option value="รับตู้สินค้าส่งสาขา">รับตู้สินค้าส่งสาขา</option>
+          <option value="ส่งไม้พาเลท">ส่งไม้พาเลท</option>
+          <option value="รับสินค้าคืน">รับสินค้าคืน</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>เบอร์โทรศัพท์</label>
+        <input type="tel" id="phone" placeholder="08XXXXXXXX" required>
+      </div>
+
+      <div class="form-group">
+        <label>แผนกที่ติดต่อ</label>
+        <input list="departments" id="department" placeholder="เลือกหรือพิมพ์แผนก" required>
+        <datalist id="departments">
+          <option value="แผนกรับสินค้า (Inbound)">
+          <option value="แผนกคีย์ข้อมูลและเอกสาร (Data Entry)">
+        </datalist>
+      </div>
+
+      <button type="submit" class="submit-btn">ส่งข้อมูล</button>
+    </form>
+  </div>
+
+  <script type="module">
+    import { db, collection, addDoc } from './firebase-config.js';
+
+    const form = document.getElementById('visitorForm');
+    const vehicleTypeSelect = document.getElementById('vehicleType');
+    const trailerPlateInput = document.getElementById('trailerPlate');
+
+    // เงื่อนไข: บังคับกรอกทะเบียนหางหากไม่ใช่รถ 4 ล้อ
+    vehicleTypeSelect.addEventListener('change', (e) => {
+      if (e.target.value !== 'รถบรรทุก 4 ล้อ') {
+        trailerPlateInput.required = true;
+        trailerPlateInput.placeholder = "ระบุทะเบียนหาง (จำเป็นต้องกรอก)";
+      } else {
+        trailerPlateInput.required = false;
+        trailerPlateInput.placeholder = "ระบุทะเบียนหาง (ถ้ามี)";
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const now = new Date();
+      // จัดรูปแบบวันที่ (DD/MM/YYYY)
+      const dateStr = now.toLocaleDateString('th-TH');
+      // จัดรูปแบบเวลา (HH:mm)
+      const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+      const visitorData = {
+        date: dateStr,
+        timeIn: timeStr,
+        timeOut: "-",
+        prefix: document.getElementById('prefix').value,
+        fullName: document.getElementById('fullName').value,
+        company: document.getElementById('company').value,
+        vehicleType: document.getElementById('vehicleType').value,
+        licensePlate: document.getElementById('licensePlate').value,
+        trailerPlate: document.getElementById('trailerPlate').value || "-",
+        purpose: document.getElementById('purpose').value,
+        phone: document.getElementById('phone').value,
+        department: document.getElementById('department').value,
+        status: "อยู่ในพื้นที่",
+        timestamp: now // เก็บไว้สำหรับเรียงลำดับใน Dashboard
+      };
+
+      try {
+        await addDoc(collection(db, "visitors"), visitorData);
+        alert('บันทึกข้อมูลสำเร็จ');
+        form.reset();
+        trailerPlateInput.required = false; // รีเซ็ตสถานะบังคับกรอก
+      } catch (error) {
+        console.error("Error adding document: ", error);
+        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่');
+      }
+    });
+  </script>
+</body>
+</html>
